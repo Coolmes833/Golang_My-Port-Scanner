@@ -1,0 +1,4 @@
+// example logs that created after the command for open ports detecting
+
+{"host":"scanme.nmap.org","start_port":1,"end_port":6000,"timeout_seconds":1,"worker_count":10000,"duration_seconds":1.0797014,"timestamp":"2025-07-10T14:00:23Z","open_ports":null}
+{"host":"192.168.1.1","start_port":1,"end_port":6000,"timeout_seconds":1,"worker_count":10000,"duration_seconds":1.1288847,"timestamp":"2025-07-10T14:00:52Z","open_ports":[{"port":53,"service":"DNS"},{"port":80,"service":"HTTP"},{"port":443,"service":"HTTPS"}]}
