@@ -1,0 +1,16 @@
+encoding/json: JSON formatında veri okuma/yazma.
+
+flag: Komut satırı argümanlarını okumak için kullanılır.
+
+fmt: Ekrana yazı yazmak ve biçimlendirme yapmak için kullanılır.
+
+net: Ağ bağlantıları kurmak için (örneğin TCP ile portları taramak).
+
+os: Dosya ve işletim sistemi işlemleri.
+
+sort: Verileri sıralamak için.
+
+sync: Paralel (eş zamanlı) işlemler için senkronizasyon mekanizmaları.
+
+time: Zamanla ilgili işlemler için (örneğin zaman aşımı hesaplama).
+

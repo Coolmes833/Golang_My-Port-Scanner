@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Go'da type anahtar kelimesi ile yeni veri yapıları tanımlanır. ScanReport, tarama sonucunu özetleyen bir yapıdır. İçinde hedef IP, port aralıkları, tarama süresi, açık portlar gibi bilgiler tutulur.
 type ScanReport struct {
 	Host        string       `json:"host"`
 	StartPort   int          `json:"start_port"`
@@ -22,18 +23,24 @@ type ScanReport struct {
 	OpenPorts   []PortResult `json:"open_ports"`
 }
 
+// Bu yapı ise her bir portla ilgili sonucu tutar. Port numarası, açık olup olmadığı (Open boolean tipi) ve eğer biliniyorsa hangi servise ait olduğu (Service) bilgisi.
 type PortResult struct {
 	Port    int    `json:"port"`
 	Open    bool   `json:"-"`
 	Service string `json:"service"`
 }
 
+// serviceMap: JSON dosyasından gelen port numarası - servis adı eşleşmeleri burada tutulur.
+// results: Tüm portlar için elde edilen sonuçlar burada saklanır.
+// mu: Eşzamanlılık (concurrency) durumlarında results listesine erişimde veri tutarlılığı için Mutex (kilitleme) kullanılır.
 var (
 	serviceMap map[string]string
 	results    []PortResult
 	mu         sync.Mutex
 )
 
+// Bu fonksiyon, services.json adlı dosyamı okur. Dosya içeriği bir JSON nesnesidir.
+// Okunduktan sonra yukarıda ki serviceMap adlı map veri yapısına yüklenir. Amaç, hangi portun hangi servise ait olduğunu yazdırabilmek.
 func loadServiceMap(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -42,24 +49,28 @@ func loadServiceMap(filename string) error {
 	return json.Unmarshal(data, &serviceMap)
 }
 
+// IPv4 ve IPv6 adreslerini doğru şekilde biçimlendirmek için:
 func formatAddress(host string, port int) string {
 	if net.ParseIP(host).To4() == nil {
-		return fmt.Sprintf("[%s]:%d", host, port)
+		return fmt.Sprintf("[%s]:%d", host, port) // IPv6
 	}
-	return fmt.Sprintf("%s:%d", host, port)
+	return fmt.Sprintf("%s:%d", host, port) //IPv4
 }
 
+// Bu fonksiyon, her bir iş parçacığının (thread/worker) ne yapacağını tanımlar. Her worker kendisine verilen portları kontrol eder.
 func worker(wg *sync.WaitGroup, host string, timeout time.Duration, jobs <-chan int) {
 	defer wg.Done()
 
 	for port := range jobs {
 		address := formatAddress(host, port)
 		conn, err := net.DialTimeout("tcp", address, timeout)
+		//Burada TCP üzerinden portun açık olup olmadığı test edilir. Eğer bağlantı kurulabiliyorsa, port açıktır. Sonuç results dizisine eklenir.
 		isOpen := false
 		if err == nil {
 			isOpen = true
 			conn.Close()
 		}
+		//
 
 		mu.Lock()
 		results = append(results, PortResult{
@@ -71,6 +82,7 @@ func worker(wg *sync.WaitGroup, host string, timeout time.Duration, jobs <-chan 
 	}
 }
 
+// Portun numarasına göre bilinen bir servis varsa, adını döner. Yoksa “Bilinmeyen Port” yazar.
 func portName(port int) string {
 	key := fmt.Sprintf("%d", port)
 	if name, ok := serviceMap[key]; ok {
@@ -78,6 +90,24 @@ func portName(port int) string {
 	}
 	return "Bilinmeyen Port"
 }
+
+/*
+	main() Fonksiyonu içinde:
+
+Komut satırından girilen bilgiler alınır: host, start, end, timeout, workers.
+
+Tarama süresi başlangıç zamanı alınır: startTime := time.Now()
+
+Worker sayısı kadar go fonksiyonu başlatılır.
+
+Her port için görev kanalına (jobs) iş verilir.
+
+Tüm işler bitene kadar WaitGroup ile beklenir.
+
+Sonuçlar sıralanır ve sadece açık portlar yazdırılır.
+
+Sonuçlar open_ports.jsonl dosyasına JSON formatında eklenir.
+*/
 
 func main() {
 	// Flags
@@ -147,6 +177,10 @@ func main() {
 		}
 	}
 
+	//os.O_APPEND: Varsa dosyanın sonuna ekle
+	// os.O_CREATE: Dosya yoksa oluştur
+	// 0644: Dosya izinleri (okuma-yazma)
+	// Sonuçlar json.NewEncoder(file).Encode(report) ile yazılır.
 	file, err := os.OpenFile("open_ports.jsonl",
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
